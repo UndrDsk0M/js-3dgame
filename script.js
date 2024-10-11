@@ -206,7 +206,7 @@ script.js
             blocks.forEach(block => scene.remove(block));
             blocks.clear();
 
-            // ایجاد زمین قبلی دوباره
+            
             createGround(oldOffsetX, offsetZ);
         }
 

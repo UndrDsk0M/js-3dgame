@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALP</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #controls { position: absolute; bottom: 30px; left: 30px; }
+        button { width: 50px; height: 50px; margin: 5px; font-size: 18px; background-color: rgba(25, 25, 184, 0.8); border-radius: 50px; }
+    </style>
+</head>
+<body>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+    // 1. ایجاد صحنه، دوربین و رندرر
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x060f1c);
+    scene.fog = new THREE.FogExp2(0x0d0d0d, 0.05);
+
+
+        // 2. Load texture for moon
+    const textureLoader = new THREE.TextureLoader();
+    const moonTexture = textureLoader.load('./images/2k_moon.jpg');
+
+    // نیازی به تنظیمات تکرار برای تکسچر نیست، بنابراین این خطوط کامنت شده باقی می‌مانند.
+    // moonTexture.wrapS = moonTexture.wrapT = THREE.RepeatWrapping; 
+    // moonTexture.repeat.set(10, 10); 
+        // 2. Load texture for ground
+    const groundTexture = textureLoader.load('./images/ground.jpg'); // Place the path to your texture file
+    groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping; // Repeat the texture
+    groundTexture.repeat.set(10, 10); // Control the repetition (adjust this based on your texture)
+
+    
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    // 2. تنظیمات زمین
+    const blockSize = 1;
+    const worldSize = 20; // اندازه جدید برای تولید زمین
+    const blocks = new Set(); // برای نگهداری بلوک‌ها
+    let offsetX = 0;
+    let offsetZ = 0;
+
+    // تابع ایجاد زمین
+    function createGround(xOffset, zOffset) {
+        const blockGeometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+        const groundMaterial = new THREE.MeshStandardMaterial({ map: groundTexture,emissiveIntensity: 0.2  });
+
+        for (let x = -worldSize / 2; x < worldSize / 2; x++) {
+            for (let z = -worldSize / 2; z < worldSize / 2; z++) {
+                const groundBlock = new THREE.Mesh(blockGeometry, groundMaterial);
+                groundBlock.position.set(x + xOffset, -1, z + zOffset);
+                groundBlock.receiveShadow = true;
+                blocks.add(groundBlock);
+                scene.add(groundBlock);
+            }
+        }
+    }
+
+    // ایجاد زمین اولیه
+    createGround(offsetX, offsetZ);
+
+    // 3. ایجاد درخت‌های ترسناک
+    const treeTrunkMaterial = new THREE.MeshStandardMaterial({ color: 0x4d1408 });
+    const treeLeavesMaterial = new THREE.MeshStandardMaterial({ color: 0x13590c, roughness: 0.9, metalness: 0.1 });
+
+    function createScaryTree(x, z) {
+        const trunkHeight = Math.random() * 5 + 5;
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, trunkHeight), treeTrunkMaterial);
+        trunk.position.set(x, trunkHeight / 2 - 1, z);
+        trunk.castShadow = true;
+        scene.add(trunk);
+
+        const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.5, 3, 8), treeLeavesMaterial);
+        leaves.position.set(x, trunkHeight - 1, z);
+        leaves.castShadow = true;
+        scene.add(leaves);
+    }
+
+    function addTrees(xOffset, zOffset) {
+        for (let i = 0; i < 20; i++) {
+            const x = Math.floor(Math.random() * worldSize) - worldSize / 2 + xOffset;
+            const z = Math.floor(Math.random() * worldSize) - worldSize / 2 + zOffset;
+            createScaryTree(x, z);
+        }
+    }
+
+    // 4. ایجاد سنگ‌ها و گرگ‌ها
+    const createRocksAndWolves = (offsetX, offsetZ) => {
+        // ایجاد سنگ‌ها
+        const rockGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+        const rockMaterial = new THREE.MeshStandardMaterial({ color: 0x7d7d7d });
+        for (let i = 0; i < 10; i++) {
+            const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+            rock.position.set(
+                Math.random() * worldSize - worldSize / 2 + offsetX,
+                -0.5,
+                Math.random() * worldSize - worldSize / 2 + offsetZ
+            );
+            rock.castShadow = true;
+            scene.add(rock);
+        }
+
+        // ایجاد گرگ‌ها
+        const wolfMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
+        for (let i = 0; i < 5; i++) {
+            const wolf = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 1), wolfMaterial);
+            wolf.position.set(
+                Math.random() * worldSize - worldSize / 2 + offsetX,
+                0,
+                Math.random() * worldSize - worldSize / 2 + offsetZ
+            );
+            wolf.castShadow = true;
+            scene.add(wolf);
+        }
+    };
+
+    // 5. ایجاد ماه
+    const moonGeometry = new THREE.SphereGeometry(2, 32, 32);
+    const moonMaterial = new THREE.MeshStandardMaterial({
+        map: moonTexture, // استفاده از تکسچر برای ماه
+        color: 0xffffff,
+        emissive: 'rgb(250, 250, 250)',
+        emissiveIntensity: 0.2 
+    });
+    const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+    moon.position.set(5, 5, -10);
+    scene.add(moon);
+
+
+    // 6. نورپردازی
+    const dimLight = new THREE.DirectionalLight(0x444444, 0.4);
+    dimLight.position.set(10, 20, 10);
+    dimLight.castShadow = true;
+    scene.add(dimLight);
+
+    const ambientLight = new THREE.AmbientLight(0x111111);
+    scene.add(ambientLight);
+
+    // 7. موقعیت دوربین
+    camera.position.set(0, 2, 5);
+
+    // 8. کنترل ماوس
+    let isMouseDown = false;
+    let previousMousePosition = { x: 0, y: 0 };
+
+    window.addEventListener('mousedown', (event) => {
+        isMouseDown = true;
+        previousMousePosition = { x: event.clientX, y: event.clientY };
+    });
+
+    window.addEventListener('mouseup', () => {
+        isMouseDown = false;
+    });
+
+    window.addEventListener('mousemove', (event) => {
+        if (isMouseDown) {
+            const deltaX = event.clientX - previousMousePosition.x;
+            const deltaY = event.clientY - previousMousePosition.y;
+
+            camera.rotation.y -= deltaX * 0.005;
+            camera.rotation.x -= deltaY * 0.005;
+
+            previousMousePosition = { x: event.clientX, y: event.clientY };
+        }
+    });
+
+    // 9. ایجاد دکمه‌ها
+    const controls = document.createElement('div');
+    controls.id = 'controls';
+    controls.style.backgroundColor = 'rgba(20, 20, 20, 0.8)';
+    // controls.style.position = 'absolute';
+    // controls.style.top = '10px';
+    // controls.style.left = '10px';
+    // controls.style.padding = '10px';
+    // controls.style.borderRadius = '10px';
+    // controls.style.boxShadow = '0 0 10px rgba(0, 0,0, 0.5)';
+
+    document.body.appendChild(controls);
+    let hold;
+
+    const createButton = (text, onClick) => {
+        const button = document.createElement('button');
+        button.innerText = text;
+        button.onclick = onClick;
+        button.addEventListener("mousedown", function() {
+            hold = setInterval(function() {
+                onClick()
+                // فانکشن دلخواه شما که باید در حین نگه‌داشتن اجرا شود
+            }, 50); // هر 100 میلی‌ثانیه فانکشن اجرا می‌شود
+        });
+        button.addEventListener("mouseleave", function() {
+            clearInterval(hold);
+        });
+        button.addEventListener("mouseup", function() {
+            clearInterval(holdInterval); // متوقف کردن فانکشن وقتی دکمه رها می‌شود
+        });
+
+        controls.appendChild(button);
+    };
+
+
+
+    createButton('w', () => {
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction); // Get the camera's forward direction
+        camera.position.addScaledVector(direction, 0.5); // Move forward in the direction the camera is looking
+    });
+
+    createButton('s', () => {
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction); // Get the camera's forward direction
+        camera.position.addScaledVector(direction, -0.5); // Move backward in the direction the camera is looking
+    });
+
+    createButton('a', () => {
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        direction.crossVectors(camera.up, direction); // Get the camera's left direction
+        camera.position.addScaledVector(direction, 0.5); // Move left relative to the camera
+    });
+
+    createButton('d', () => {
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        direction.crossVectors(direction, camera.up); // Get the camera's right direction
+        camera.position.addScaledVector(direction, 0.5); // Move right relative to the camera
+    });
+
+
+// 11. کنترل کیبورد
+window.addEventListener('keydown', (event) => {
+    const direction = new THREE.Vector3();
+    camera.getWorldDirection(direction); // جهت فعلی دوربین را دریافت کن
+
+    switch (event.key.toLowerCase()) {
+        case 'arrowup':
+        case 'w':
+            camera.position.addScaledVector(direction, 0.7); // جلو رفتن در جهت نگاه دوربین
+            break;
+        case 'arrowdown':
+        case 's':
+            camera.position.addScaledVector(direction, -0.5); // عقب رفتن در جهت مخالف نگاه دوربین
+            break;
+        case 'arrowleft':
+        case 'a':
+            direction.crossVectors(camera.up, direction); // جهت چپ دوربین را محاسبه کن
+            camera.position.addScaledVector(direction, 0.5); // حرکت به سمت چپ
+            break;
+        case 'arrowright':
+        case 'd':
+            direction.crossVectors(direction, camera.up); // جهت راست دوربین را محاسبه کن
+            camera.position.addScaledVector(direction, 0.5); // حرکت به سمت راست
+            break;
+    }
+});
+
+    // 9. تابع انیمیشن
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+
+        // 10. نظارت بر موقعیت دوربین و ایجاد زمین جدید
+        const cameraPosX = Math.floor(camera.position.x / blockSize);
+        const cameraPosZ = Math.floor(camera.position.z / blockSize);
+
+        // بررسی موقعیت دوربین برای ایجاد زمین جدید
+        if (Math.abs(camera.position.x - offsetX) >= worldSize / 2) {
+            const oldOffsetX = offsetX;
+            offsetX = camera.position.x;
+            createGround(offsetX, offsetZ);
+            addTrees(offsetX, offsetZ);
+            createRocksAndWolves(offsetX, offsetZ);
+
+            // حذف زمین‌های قدیمی
+            blocks.forEach(block => scene.remove(block));
+            blocks.clear();
+
+            // ایجاد زمین قبلی دوباره
+            createGround(oldOffsetX, offsetZ);
+        }
+
+        if (Math.abs(camera.position.z - offsetZ) >= worldSize / 2) {
+            const oldOffsetZ = offsetZ;
+            offsetZ = camera.position.z;
+            createGround(offsetX, offsetZ);
+            addTrees(offsetX, offsetZ);
+            createRocksAndWolves(offsetX, offsetZ);
+
+            // حذف زمین‌های قدیمی
+            // blocks.forEach(block => scene.remove(block));
+            // blocks.clear();
+
+            // ایجاد زمین قبلی دوباره
+            createGround(offsetX, oldOffsetZ);
+        }
+    }
+
+    animate();
+
+    // 11. تغییر اندازه صفحه
+    window.addEventListener('resize', function () {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+    });
+</script>
+</body>
+</html>

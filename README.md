@@ -1,5 +1,5 @@
-##### A Small 3D Js animation
+# Moon Project
 
-(For working with js 3d )
+###### A JS 3D mini project forked from [UndrDsk0M](https://github.com/UndrDsk0M/js-3dgame)
 
 [Live](https://tamana543.github.io/3D-animation-/)
